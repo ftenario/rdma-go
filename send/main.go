@@ -134,6 +134,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"time"
 	"unsafe"
 )
 
@@ -371,6 +372,7 @@ func main() {
 		fmt.Println("RDMA connection established! Sending file...")
 	}
 
+	start := time.Now()
 	transferred := uint64(0)
 	for transferred < fileSizeBytes {
 		remaining := fileSizeBytes - transferred
@@ -437,8 +439,14 @@ func main() {
 	}
 	if !quiet {
 		fmt.Printf("Transfer complete: %d bytes sent successfully\n", fileSizeBytes)
-		fmt.Println("File sent successfully via RDMA! ✅")
 	}
+
+	elapsed := time.Since(start)
+	throughput := float64(fileSizeBytes) / elapsed.Seconds() / 1024 / 1024 / 1024 * 8
+
+	fmt.Printf("File sent successfully! ✅\n")
+	fmt.Printf("Time:       %v\n", elapsed)
+	fmt.Printf("Throughput: %.2f Gbps\n", throughput)
 }
 
 func marshalConnInfo(info connInfo) []byte {

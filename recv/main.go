@@ -99,11 +99,13 @@ static int modify_qp_rts(struct ibv_qp *qp) {
 import "C"
 
 import (
+	"crypto/md5"
 	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
 	"strconv"
+	"time"
 	"unsafe"
 )
 
@@ -247,6 +249,7 @@ func main() {
 		fmt.Println("RDMA connection ready! Waiting for data...")
 	}
 
+	start := time.Now()
 	received := uint64(0)
 	for received < remoteInfo.FileSize {
 		msgBuf := make([]byte, 12)
@@ -296,9 +299,24 @@ func main() {
 	if summary || verbose {
 		fmt.Printf("Transferred %d/%d bytes (100.00%%)\n", remoteInfo.FileSize, remoteInfo.FileSize)
 	}
+
+	elapsed := time.Since(start)
+	throughput := float64(remoteInfo.FileSize) / elapsed.Seconds() / 1024 / 1024 / 1024 * 8
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "read %s for checksum: %v\n", outPath, err)
+		os.Exit(1)
+	}
+	checksum := md5.Sum(data)
+
+	fmt.Printf("File received and saved to: %s ✅\n", outPath)
+	fmt.Printf("Time:       %v\n", elapsed)
+	fmt.Printf("Throughput: %.2f Gbps\n", throughput)
+	fmt.Printf("MD5:        %x\n", checksum)
+
 	if !quiet {
 		fmt.Printf("Transfer complete: %d bytes written to %s\n", remoteInfo.FileSize, outPath)
-		fmt.Printf("File received and saved to: %s ✅\n", outPath)
 	}
 }
 
