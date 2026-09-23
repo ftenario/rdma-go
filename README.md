@@ -18,16 +18,14 @@ This code is intentionally kept separate from the C version and is intended to b
 ## Folder layout
 
 ```text
-go/
+rdma-go/
 ├── Makefile
 ├── README.md
 ├── go.mod
 ├── send/
-│   ├── main.go
-│   └── rdma_common.go
+│   └── main.go
 ├── recv/
-│   ├── main.go
-│   └── rdma_common.go
+│   └── main.go
 ├── rdma_file_send_go
 └── rdma_file_recv_go
 ```
