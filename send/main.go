@@ -160,10 +160,12 @@ type chunkMsg struct {
 	Length uint32
 }
 
+// printUsage prints the expected command line for the sender.
 func printUsage() {
 	fmt.Printf("Usage: %s [--verbose|--summary|--quiet] <server_ip> <file_to_send>\n", sendAppName)
 }
 
+// sendAll writes all bytes in data to the TCP control socket.
 func sendAll(conn net.Conn, data []byte) error {
 	for written := 0; written < len(data); {
 		n, err := conn.Write(data[written:])
@@ -175,6 +177,7 @@ func sendAll(conn net.Conn, data []byte) error {
 	return nil
 }
 
+// recvAll reads exactly len(data) bytes from the TCP control socket.
 func recvAll(conn net.Conn, data []byte) error {
 	for read := 0; read < len(data); {
 		n, err := conn.Read(data[read:])
@@ -186,6 +189,7 @@ func recvAll(conn net.Conn, data []byte) error {
 	return nil
 }
 
+// parseFlags handles the sender CLI flags and returns any non-flag arguments.
 func parseFlags(args []string) (verbose, summary, quiet bool, rest []string, err error) {
 	rest = args
 	for len(rest) > 0 {
@@ -206,6 +210,7 @@ func parseFlags(args []string) (verbose, summary, quiet bool, rest []string, err
 	return verbose, summary, quiet, rest, nil
 }
 
+// fileSize returns the size of a file on disk in bytes.
 func fileSize(path string) (uint64, error) {
 	st, err := os.Stat(path)
 	if err != nil {
@@ -214,6 +219,7 @@ func fileSize(path string) (uint64, error) {
 	return uint64(st.Size()), nil
 }
 
+// setupRDMAContext creates the local RDMA context, protection domain, CQ, QP, and registered buffer.
 func setupRDMAContext() (*C.struct_ibv_context, *C.struct_ibv_pd, *C.struct_ibv_cq, *C.struct_ibv_qp, *C.struct_ibv_mr, unsafe.Pointer) {
 	ctx := C.open_first_device()
 	if ctx == nil {
@@ -263,6 +269,7 @@ func setupRDMAContext() (*C.struct_ibv_context, *C.struct_ibv_pd, *C.struct_ibv_
 	return ctx, pd, cq, qp, mr, buf
 }
 
+// activateQP moves the queue pair into the INIT state so the sender can begin RDMA setup.
 func activateQP(qp *C.struct_ibv_qp, portNum int) error {
 	if C.modify_qp_init(qp, C.int(portNum)) != 0 {
 		return errors.New("ibv_modify_qp INIT failed")
@@ -270,6 +277,7 @@ func activateQP(qp *C.struct_ibv_qp, portNum int) error {
 	return nil
 }
 
+// main performs the sender-side connection setup, negotiates the remote RDMA metadata, and streams the file in chunks.
 func main() {
 	verbose, summary, quiet, rest, err := parseFlags(os.Args[1:])
 	if err != nil {
@@ -449,6 +457,7 @@ func main() {
 	fmt.Printf("Throughput: %.2f Gbps\n", throughput)
 }
 
+// marshalConnInfo serializes the local sender metadata so the receiver can connect the RDMA QP.
 func marshalConnInfo(info connInfo) []byte {
 	buf := make([]byte, 42)
 	binary.NativeEndian.PutUint32(buf[0:4], info.QPNum)
@@ -460,6 +469,7 @@ func marshalConnInfo(info connInfo) []byte {
 	return buf
 }
 
+// unmarshalConnInfo restores the receiver metadata from the network payload.
 func unmarshalConnInfo(data []byte) connInfo {
 	var info connInfo
 	info.QPNum = binary.NativeEndian.Uint32(data[0:4])
@@ -471,6 +481,7 @@ func unmarshalConnInfo(data []byte) connInfo {
 	return info
 }
 
+// marshalChunkMsg serializes a chunk offset and length so the receiver can validate and write each file segment.
 func marshalChunkMsg(msg chunkMsg) []byte {
 	buf := make([]byte, 12)
 	binary.NativeEndian.PutUint64(buf[0:8], msg.Offset)

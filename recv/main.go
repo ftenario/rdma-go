@@ -131,6 +131,7 @@ type chunkMsg struct {
 	Length uint32
 }
 
+// main sets up the receiver, exchanges RDMA metadata, writes each chunk to disk, and prints a completion summary.
 func main() {
 	verbose, summary, quiet, rest, err := parseFlags(os.Args[1:])
 	if err != nil {
@@ -320,6 +321,7 @@ func main() {
 	}
 }
 
+// parseFlags handles the receiver CLI flags and returns the remaining positional arguments.
 func parseFlags(args []string) (verbose, summary, quiet bool, rest []string, err error) {
 	rest = args
 	for len(rest) > 0 {
@@ -340,6 +342,7 @@ func parseFlags(args []string) (verbose, summary, quiet bool, rest []string, err
 	return verbose, summary, quiet, rest, nil
 }
 
+// sendAll writes all bytes in data to the TCP control socket.
 func sendAll(conn net.Conn, data []byte) error {
 	for written := 0; written < len(data); {
 		n, err := conn.Write(data[written:])
@@ -351,6 +354,7 @@ func sendAll(conn net.Conn, data []byte) error {
 	return nil
 }
 
+// recvAll reads exactly len(data) bytes from the TCP control socket.
 func recvAll(conn net.Conn, data []byte) error {
 	for read := 0; read < len(data); {
 		n, err := conn.Read(data[read:])
@@ -362,6 +366,7 @@ func recvAll(conn net.Conn, data []byte) error {
 	return nil
 }
 
+// setupRDMAContext creates the local RDMA context, queue pair, completion queue, and registered receive buffer.
 func setupRDMAContext() (*C.struct_ibv_context, *C.struct_ibv_pd, *C.struct_ibv_cq, *C.struct_ibv_qp, *C.struct_ibv_mr, unsafe.Pointer) {
 	ctx := C.open_first_device()
 	if ctx == nil {
@@ -411,6 +416,7 @@ func setupRDMAContext() (*C.struct_ibv_context, *C.struct_ibv_pd, *C.struct_ibv_
 	return ctx, pd, cq, qp, mr, buf
 }
 
+// activateQP moves the queue pair into the INIT state so the receiver can connect to the peer.
 func activateQP(qp *C.struct_ibv_qp, portNum int) error {
 	if C.modify_qp_init(qp, C.int(portNum)) != 0 {
 		return fmt.Errorf("ibv_modify_qp INIT failed")
@@ -418,6 +424,7 @@ func activateQP(qp *C.struct_ibv_qp, portNum int) error {
 	return nil
 }
 
+// marshalConnInfo serializes the receiver's local RDMA metadata for the TCP handshake.
 func marshalConnInfo(info connInfo) []byte {
 	buf := make([]byte, 42)
 	binary.NativeEndian.PutUint32(buf[0:4], info.QPNum)
@@ -429,6 +436,7 @@ func marshalConnInfo(info connInfo) []byte {
 	return buf
 }
 
+// unmarshalConnInfo reads the sender's RDMA connection metadata from the TCP exchange.
 func unmarshalConnInfo(data []byte) connInfo {
 	var info connInfo
 	info.QPNum = binary.NativeEndian.Uint32(data[0:4])
